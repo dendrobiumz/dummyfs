@@ -31,11 +31,28 @@ struct dummy_inode {
 // };
 
 struct dummy_superblock {
+    uint32_t s_magic;
     uint32_t s_inodes_count;
     uint32_t s_blocks_count;
 
+    uint32_t s_free_blocks_count;
+    uint32_t s_free_inodes_count;
+
+    uint32_t s_first_data_block;
+    uint32_t s_blocks_per_group;
+    uint32_t s_inodes_per_group;
+
     uint32_t s_mtime;
     uint32_t s_wtime;
+
+    uint16_t s_state;
+    uint16_t s_errors;
+
+    uint32_t s_lastcheck;
+    uint32_t s_inode_size;
+
+    uint64_t *cur_free_inode_bmap;
+    uint64_t *cur_free_data_blk_bmap;
 }
 
-#define INODE_PER_BLOCK   (BLOCK_SIZE / sizeof(struct dummy_disk_inode))
+#define INODE_PER_BLOCK   (BLOCK_SIZE / sizeof(struct dummy_inode))
