@@ -53,6 +53,15 @@ struct dummy_superblock {
 
     uint64_t *cur_free_inode_bmap;
     uint64_t *cur_free_data_blk_bmap;
-}
+};
 
 #define INODE_PER_BLOCK   (BLOCK_SIZE / sizeof(struct dummy_inode))
+
+struct dummy_blockgroup {
+    uint32_t bg_block_bmap; // block id
+    uint32_t bg_inode_bmap;
+    uint32_t bg_inode_table;
+    uint32_t bg_free_blocks_count;
+    uint32_t bg_free_inodes_count;
+    uint32_t bg_used_dirs_count;
+};
