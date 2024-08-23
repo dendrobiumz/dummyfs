@@ -16,6 +16,13 @@ struct dummy_inode {
     uint32_t      i_uid;
     uint32_t      i_gid;
 
+    uint32_t      i_size;
+    uint32_t      i_ctime; // time when inode was created
+    uint32_t      i_mtime; // last time when inode was modified 
+    uint32_t      i_atime; // time when inode was accessed  
+    uint32_t      i_links_count;
+    uint32_t      i_flags;
+    uint32_t      i_block[15]; // 0 - 11 direct block no, 12 - 15 indirect block
 };
 
 
