@@ -8,6 +8,7 @@
 #define MAX_INODE_NB        (1 << 10)
 
 #define MAX_NAME_LEN  (255)
+#define MAX_BLK_NR    (16)
 
 #include <linux/stddef.h>
 #include <linux/types.h>
@@ -24,12 +25,12 @@ struct dummy_inode_disk {
     uint32_t      i_atime; // time when inode was accessed  
     uint32_t      i_links_count;
     uint32_t      i_flags;
-    uint32_t      i_block[15]; // 0 - 11 direct block no, 12 - 15 indirect block
+    uint32_t      i_block[MAX_BLK_NR]; // 0 - 11 direct block no, 12 - 15 indirect block
 };
 
 struct dummy_inode_mem {
     struct inode vfs_inode;
-    char         i_block_no[15];
+    char         i_block_no[MAX_BLK_NR];
 };
 
 struct dummy_superblock {
@@ -57,7 +58,7 @@ struct dummy_superblock {
     uint64_t *cur_free_data_blk_bmap;
 };
 
-#define INODE_PER_BLOCK   (BLOCK_SIZE / sizeof(struct dummy_inode))
+#define INODE_PER_BLOCK   (BLOCK_SIZE / sizeof(struct dummy_inode_disk))
 
 struct dummy_blockgroup {
     uint32_t bg_block_bmap; // block id
