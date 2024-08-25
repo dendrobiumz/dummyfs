@@ -7,11 +7,13 @@
 #define MAX_DATA_BLOCK_NB   (BLOCK_SIZE * sizeof(uint64_t))
 #define MAX_INODE_NB        (1 << 10)
 
+#define MAX_NAME_LEN  (255)
+
 #include <linux/stddef.h>
 #include <linux/types.h>
 
 
-struct dummy_inode {
+struct dummy_inode_disk {
     uint16_t      i_mode;
     uint32_t      i_uid;
     uint32_t      i_gid;
@@ -25,17 +27,10 @@ struct dummy_inode {
     uint32_t      i_block[15]; // 0 - 11 direct block no, 12 - 15 indirect block
 };
 
-
-// struct dummy_superblock {
-//     uint32_t    magic;
-    
-//     uint32_t    nb_blocks;
-//     uint32_t    nb_inodes;
-//     uint32_t    block_sz;
-//     uint32_t    nb_free_blocks;
-//     uint32_t    nb_free_inodes;
-
-// };
+struct dummy_inode_mem {
+    struct inode vfs_inode;
+    char         i_block_no[15];
+};
 
 struct dummy_superblock {
     uint32_t s_magic;
@@ -72,3 +67,19 @@ struct dummy_blockgroup {
     uint32_t bg_free_inodes_count;
     uint32_t bg_used_dirs_count;
 };
+
+struct dummy_dentry {
+    uint32_t inode; // inode number
+    uint32_t rec_len;
+    uint8_t  name_len;
+    uint8_t  file_type;
+    char     name[MAX_NAME_LEN];
+};
+
+
+struct dummyfs_file {
+    uint32_t inode_no;
+    char filename[MAX_NAME_LEN];
+};
+
+int dummyfs_fill_super(struct super_block *sb, void *data, int silent);
