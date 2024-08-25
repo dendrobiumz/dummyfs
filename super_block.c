@@ -11,9 +11,9 @@ static struct kmem_cache *dummyfs_inode_cache;
 int dummyfs_init_inode_cache()
 {
     dummyfs_inode_cache = kmem_cache_create_usercopy("dummyfs_inode_cache", 
-                            sizeof(struct dummy_inode_mem),
+                            sizeof(struct dummyfs_inode_mem),
                             0, 0, 0,
-                            sizeof(struct dummy_inode_mem), NULL);
+                            sizeof(struct dummyfs_inode_mem), NULL);
     if (dummyfs_inode_cache == NULL)
         return -ENOMEM;
     return 0;
@@ -49,7 +49,7 @@ void dummyfs_put_super(struct super_block *sb)
 // which contains a ‘struct inode’ embedded within it.
 struct inode *dummyfs_alloc_inode(struct super_block *sb)
 {
-    struct dummy_inode_mem *di = kmem_cache_alloc(dummyfs_inode_cache, GFP_KERNEL);
+    struct dummyfs_inode_mem *di = kmem_cache_alloc(dummyfs_inode_cache, GFP_KERNEL);
     if (di == NULL)
         return NULL;
     
@@ -64,7 +64,7 @@ struct inode *dummyfs_alloc_inode(struct super_block *sb)
 
 void dummyfs_destroy_inode(struct inode *i)
 {
-    struct dummyfs_inode_mem *di = i;
+    struct dummyfs_inode_mem *di = (struct dummyfs_inode_mem*)i;
     kmeme_cache_free(dummyfs_inode_cache, di);
 }
 
@@ -75,13 +75,25 @@ void dummyfs_destroy_inode(struct inode *i)
 int dummyfs_write_inode(struct inode *i, struct writeback_control *wbc)
 {
     struct dummyfs_inode_disk *inode_disk;
-    struct dummyfs_inode_mem *inode_mem = i;
+    struct dummyfs_inode_mem *inode_mem = (struct dummyfs_inode_mem*)i;
     struct buffer_head *bh;
+    struct super_block *sb = i->i_sb;
+    struct dummyfs_superblock *dsb = (struct dummyfs_superblock *)sb->s_fs_info;
     // read the inode block by block number into memory
     // calc real number by i->i_ino;
     uint32_t ino = i->i_ino;
     uint32_t block_cnt = ino / INODE_PER_BLOCK;
-    uint32_t block_shift = ino % INODE_PER_BLOCK;
+    uint32_t block_shift_offset = ino % INODE_PER_BLOCK;
+
+    if (ino >= dsb->s_inodes_count)
+        return 0;
+
+    bh = sb_bread(sb, block_cnt);
+    if (bh == NULL)
+        return -EIO;
+
+    inode_disk = (struct dummyfs_inode_disk*)bh->b_data;
+    inode_disk += block_shift_offset;
 
     return 0;
 }

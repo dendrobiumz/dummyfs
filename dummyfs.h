@@ -14,7 +14,7 @@
 #include <linux/types.h>
 
 
-struct dummy_inode_disk {
+struct dummyfs_inode_disk {
     uint16_t      i_mode;
     uint32_t      i_uid;
     uint32_t      i_gid;
@@ -28,12 +28,12 @@ struct dummy_inode_disk {
     uint32_t      i_block[MAX_BLK_NR]; // 0 - 11 direct block no, 12 - 15 indirect block
 };
 
-struct dummy_inode_mem {
+struct dummyfs_inode_mem {
     struct inode vfs_inode;
     char         i_block_no[MAX_BLK_NR];
 };
 
-struct dummy_superblock {
+struct dummyfs_superblock {
     uint32_t s_magic;
     uint32_t s_inodes_count;
     uint32_t s_blocks_count;
@@ -58,9 +58,9 @@ struct dummy_superblock {
     uint64_t *cur_free_data_blk_bmap;
 };
 
-#define INODE_PER_BLOCK   (BLOCK_SIZE / sizeof(struct dummy_inode_disk))
+#define INODE_PER_BLOCK   (BLOCK_SIZE / sizeof(struct dummyfs_inode_disk))
 
-struct dummy_blockgroup {
+struct dummyfs_blockgroup {
     uint32_t bg_block_bmap; // block id
     uint32_t bg_inode_bmap;
     uint32_t bg_inode_table;
@@ -69,7 +69,7 @@ struct dummy_blockgroup {
     uint32_t bg_used_dirs_count;
 };
 
-struct dummy_dentry {
+struct dummyfs_dentry {
     uint32_t inode; // inode number
     uint32_t rec_len;
     uint8_t  name_len;
