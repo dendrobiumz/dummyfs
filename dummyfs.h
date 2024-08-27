@@ -2,13 +2,20 @@
 #define DUMMY_MAGIC  (0x12110610)
 
 #define BLOCK_BIT     (12)
-#define BLOCK_SIZE    (1 << BLOCK_BIT)
+#define DUMMY_BLOCK_SIZE    (1 << BLOCK_BIT)
 
 #define MAX_DATA_BLOCK_NB   (BLOCK_SIZE * sizeof(uint64_t))
 #define MAX_INODE_NB        (1 << 10)
 
 #define MAX_NAME_LEN  (255)
 #define MAX_BLK_NR    (16)
+
+#define SB_BLOCK_NO   (0)
+#define BG_BLOCK_NO   (1)
+#define INODE_BITMAP_BLOCK_NO (2)
+#define BLOCK_BITMAP_BLOCK_NO (3)
+#define INODE_TABLE_BLOCK_NO  (4)
+#define DATA_BLOCK_START_NO   (5)
 
 #include <linux/stddef.h>
 #include <linux/types.h>
@@ -70,7 +77,7 @@ struct dummyfs_blockgroup {
 };
 
 struct dummyfs_dentry {
-    uint32_t inode; // inode number
+    uint32_t inode_no; // inode number in inode table
     uint32_t rec_len;
     uint8_t  name_len;
     uint8_t  file_type;
@@ -79,7 +86,7 @@ struct dummyfs_dentry {
 
 
 struct dummyfs_file {
-    uint32_t inode_no;
+    uint32_t inode_no; // inode number in inode table
     char filename[MAX_NAME_LEN];
 };
 
