@@ -1,6 +1,7 @@
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/buffer_head.h>
+#include <linux/statfs.h>
 
 #include "dummyfs.h"
 
@@ -11,9 +12,9 @@ static struct kmem_cache *dummyfs_inode_cache;
 int dummyfs_init_inode_cache()
 {
     dummyfs_inode_cache = kmem_cache_create_usercopy("dummyfs_inode_cache", 
-                            sizeof(struct dummy_inode_mem),
+                            sizeof(struct dummyfs_inode_mem),
                             0, 0, 0,
-                            sizeof(struct dummy_inode_mem), NULL);
+                            sizeof(struct dummyfs_inode_mem), NULL);
     if (dummyfs_inode_cache == NULL)
         return -ENOMEM;
     return 0;
@@ -49,7 +50,7 @@ void dummyfs_put_super(struct super_block *sb)
 // which contains a ‘struct inode’ embedded within it.
 struct inode *dummyfs_alloc_inode(struct super_block *sb)
 {
-    struct dummy_inode_mem *di = kmem_cache_alloc(dummyfs_inode_cache, GFP_KERNEL);
+    struct dummyfs_inode_mem *di = kmem_cache_alloc(dummyfs_inode_cache, GFP_KERNEL);
     if (di == NULL)
         return NULL;
     
@@ -64,7 +65,7 @@ struct inode *dummyfs_alloc_inode(struct super_block *sb)
 
 void dummyfs_destroy_inode(struct inode *i)
 {
-    struct dummyfs_inode_mem *di = i;
+    struct dummyfs_inode_mem *di = (struct dummyfs_inode_mem*)i;
     kmeme_cache_free(dummyfs_inode_cache, di);
 }
 
@@ -75,14 +76,40 @@ void dummyfs_destroy_inode(struct inode *i)
 int dummyfs_write_inode(struct inode *i, struct writeback_control *wbc)
 {
     struct dummyfs_inode_disk *inode_disk;
-    struct dummyfs_inode_mem *inode_mem = i;
+    struct dummyfs_inode_mem *inode_mem = (struct dummyfs_inode_mem*)i;
     struct buffer_head *bh;
+    struct super_block *sb = i->i_sb;
+    struct dummyfs_superblock *dsb = (struct dummyfs_superblock *)sb->s_fs_info;
     // read the inode block by block number into memory
     // calc real number by i->i_ino;
     uint32_t ino = i->i_ino;
     uint32_t block_cnt = ino / INODE_PER_BLOCK;
-    uint32_t block_shift = ino % INODE_PER_BLOCK;
+    uint32_t block_shift_offset = ino % INODE_PER_BLOCK;
 
+    if (ino >= dsb->s_inodes_count)
+        return 0;
+
+    bh = sb_bread(sb, block_cnt);
+    if (bh == NULL)
+        return -EIO;
+
+    inode_disk = (struct dummyfs_inode_disk*)bh->b_data;
+    inode_disk += block_shift_offset;
+
+    inode_disk->i_mode = i->i_mode;
+    inode_disk->i_size = i->i_size;
+    inode_disk->i_flags = i->i_flags;
+    inode_disk->i_uid = i_uid_read(i);
+    inode_disk->i_gid = i_gid_read(i);
+    inode_disk->i_atime = inode_get_atime_sec(i);
+    inode_disk->i_mtime = inode_get_mtime_sec(i);
+    struct timespec64 ctime = inode_get_ctime(i);
+    inode_disk->i_ctime = ctime.tv_sec;
+    strncpy(inode_disk->i_block, inode_mem->i_block_no, sizeof(inode_mem->i_block_no));
+
+    mark_buffer_dirty(bh);
+    sync_dirty_buffer(bh);
+    brelse(bh);
     return 0;
 }
 
@@ -92,6 +119,46 @@ int dummyfs_write_inode(struct inode *i, struct writeback_control *wbc)
  */
 int dummyfs_sync_fs(struct super_block *sb, int wait)
 {
+    struct dummyfs_superblock *dsb = sb->s_fs_info;
+    struct dummyfs_superblock *disk_dsb;
+
+    struct buffer_head *bh = sb_bread(sb, SB_BLOCK_NO);
+    if (bh == NULL)
+        return -EIO;
+    disk_dsb = (struct dummyfs_superblock*) bh->b_data;
+    disk_dsb->s_free_blocks_count = dsb->s_free_blocks_count;
+    disk_dsb->s_free_inodes_count = dsb->s_free_inodes_count;
+    disk_dsb->s_inodes_count = dsb->s_inodes_count;
+    disk_dsb->s_blocks_count = dsb->s_blocks_count;
+
+    mark_buffer_dirty(bh);
+    if (wait)
+        sync_dirty_buffer(bh);
+    brelse(bh);
+
+    // TO-DO
+    // FLush free inode bitmask
+
+    bh = sb_bread(sb, INODE_BITMAP_BLOCK_NO);
+    uint32_t *inode_bitmap = (uint32_t*) bh->b_data;
+    inode_bitmap += inode_bitmap - dsb->cur_free_inode_bmap;
+    *inode_bitmap = dsb->cur_free_inode_bmap;
+    mark_buffer_dirty(bh);
+    if (wait)
+        sync_dirty_buffer(bh);
+    brelse(bh);
+
+    // FLush free blocks bitmask
+    bh = sb_bread(sb, BLOCK_BITMAP_BLOCK_NO);
+    uint32_t *block_bitmap = (uint32_t*) bh->b_data;
+    block_bitmap += block_bitmap - dsb->cur_free_data_blk_bmap;
+    *block_bitmap = dsb->cur_free_data_blk_bmap;
+    mark_buffer_dirty(bh);
+    if (wait)
+        sync_dirty_buffer(bh);
+    brelse(bh);
+
+
     return 0;
 }
 
@@ -100,6 +167,18 @@ int dummyfs_sync_fs(struct super_block *sb, int wait)
  */
 int dummyfs_statfs(struct dentry *d, struct kstatfs *stat)
 {
+    struct super_block *sb = d->d_sb;
+    struct dummyfs_superblock *dsb = sb->s_fs_info;
+
+    stat->f_type = DUMMY_MAGIC;
+    stat->f_bsize = DUMMY_BLOCK_SIZE;
+    stat->f_blocks = dsb->s_blocks_count;
+    stat->f_bfree = dsb->s_free_blocks_count;
+    stat->f_bavail = dsb->s_free_blocks_count;
+    stat->f_files = dsb->s_inodes_count;
+    stat->f_ffree = dsb->s_free_inodes_count;
+    stat->f_namelen = MAX_NAME_LEN;
+
     return 0;
 }
 
